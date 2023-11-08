@@ -1,30 +1,27 @@
-use clap::{Parser, ValueEnum};
+use std::{fs, path::PathBuf};
 
-#[derive(ValueEnum, Debug, Clone)] // ArgEnum here
+use clap::{Parser, Subcommand};
+
+#[derive(Subcommand, Debug, Clone)] // ArgEnum here
 #[clap(rename_all = "kebab_case")]
 enum Command {
-    Generate,
+    Generate { path: PathBuf },
 }
 
-impl Command {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Command::Generate => "generate",
-        }
-    }
-}
-
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser)]
 struct Args {
+    #[command(subcommand)]
     command: Command,
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Command::Generate => {}
+        Command::Generate { path } => {
+            fs::create_dir(path)?;
+        }
     }
 
-    println!("Hello, {}!", args.command.as_str());
+    Ok(())
 }
