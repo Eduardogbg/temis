@@ -1,0 +1,6 @@
+[submodule "patches/near-abi-client-rs"]
+	path = patches/near-abi-client-rs
+	url = https://github.com/Eduardogbg/near-abi-client-rs
+[submodule "patches/schemafy"]
+	path = patches/schemafy
+	url = https://github.com/near/schemafy

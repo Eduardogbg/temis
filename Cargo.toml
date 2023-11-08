@@ -1,6 +1,15 @@
 [workspace]
 members = [
-    "./temis"
+    "./temis",
+    "./samples/counter",
+    "./samples/nep171",
 ]
 
 resolver = "1"
+
+[workspace.dependencies]
+near-abi-client = "0.1.0"
+
+[patch.crates-io]
+near-abi-client = { path = "patches/near-abi-client-rs/near-abi-client"}
+
