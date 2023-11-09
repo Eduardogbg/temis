@@ -10,3 +10,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 near-sdk = "4.1.1"
+
+[profile.release]
+opt-level = "z"

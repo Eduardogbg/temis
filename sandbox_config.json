@@ -1,0 +1,8 @@
+{
+    "contracts": [
+        {
+            "crate_name": "counter",
+            "path": "../samples/counter"
+        }
+    ]
+}

@@ -2,7 +2,6 @@
 members = [
     "./temis",
     "./samples/counter",
-    "./samples/nep171",
 ]
 
 resolver = "1"
