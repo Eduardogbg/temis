@@ -6,6 +6,7 @@ use std::{
     fs,
     io::{BufRead, Write},
     path::PathBuf,
+    str::FromStr,
     thread,
 };
 
@@ -13,8 +14,6 @@ use crate::transactions::{create_contract_subaccount, deploy_contract};
 
 mod constants;
 mod transactions;
-
-const TMP_PATH: &'static str = "./tmp";
 
 #[derive(Serialize, Deserialize)]
 pub struct ContractConfig {
@@ -36,6 +35,10 @@ struct SandboxConfig {
 #[derive(Subcommand, Debug, Clone)] // ArgEnum here
 #[clap(rename_all = "kebab_case")]
 enum Command {
+    Abi {
+        input_path: PathBuf,
+        output_path: PathBuf,
+    },
     Generate {
         input_path: PathBuf,
         output_path: PathBuf,
@@ -51,7 +54,7 @@ struct Args {
     command: Command,
 }
 
-fn find_file_in_dir(dir_path: &str) -> std::io::Result<String> {
+fn find_file_in_dir(dir_path: PathBuf) -> std::io::Result<String> {
     let entries = fs::read_dir(dir_path)?;
 
     for entry in entries {
@@ -68,57 +71,70 @@ fn find_file_in_dir(dir_path: &str) -> std::io::Result<String> {
     ))
 }
 
+fn write_abi(input_path: PathBuf, output_path: PathBuf) -> anyhow::Result<String> {
+    std::process::Command::new("cargo")
+        .args(&[
+            "near",
+            "abi",
+            "--manifest-path",
+            format!("{}/Cargo.toml", input_path.to_string_lossy()).as_str(),
+            "--out-dir",
+            output_path.to_str().unwrap(),
+        ])
+        .status()?;
+
+    let file = find_file_in_dir(output_path)?;
+    let abi_json = String::from_utf8(fs::read(file.clone())?)?;
+
+    let asdasd = jq_rs::run(
+        "walk(if type == \"object\" and has(\"minimum\") then del(.minimum) else . end)",
+        abi_json.as_str(),
+    )
+    .unwrap();
+
+    let sanitized = jq_rs::run(
+                "walk(if type == \"object\" then with_entries(if .key == \"Promise\" then .value |= {} else . end) else . end)",
+                asdasd.as_str()
+            ).unwrap();
+
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(file.clone())?;
+    f.write_all(sanitized.as_bytes())?;
+    f.flush()?;
+
+    Ok(file)
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     match args.command {
+        Command::Abi {
+            input_path,
+            output_path,
+        } => {
+            write_abi(input_path, output_path)?;
+        }
+
         Command::Generate {
             input_path,
             output_path,
         } => {
-            fs::create_dir(TMP_PATH)?;
+            let tmp_path = PathBuf::from_str("./tmp").unwrap();
 
-            std::process::Command::new("cargo")
-                .args(&[
-                    "near",
-                    "abi",
-                    "--manifest-path",
-                    format!("{}/Cargo.toml", input_path.to_string_lossy()).as_str(),
-                    "--out-dir",
-                    "./tmp",
-                ])
-                .status()?;
+            fs::create_dir(tmp_path.clone())?;
 
-            let file = find_file_in_dir(TMP_PATH)?;
-            println!("file path {}", file);
-
-            let abi_json = String::from_utf8(fs::read(file.clone())?)?;
-
-            let asdasd = jq_rs::run(
-                "walk(if type == \"object\" and has(\"minimum\") then del(.minimum) else . end)",
-                abi_json.as_str(),
-            )
-            .unwrap();
-
-            let sanitized = jq_rs::run(
-                "walk(if type == \"object\" then with_entries(if .key == \"Promise\" then .value |= {} else . end) else . end)",
-                asdasd.as_str()
-            ).unwrap();
-
-            let mut f = std::fs::OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .open(file.clone())?;
-            f.write_all(sanitized.as_bytes())?;
-            f.flush()?;
+            let file = write_abi(input_path, tmp_path.clone())?;
 
             near_abi_client::Generator::new(output_path)
                 .file(file.clone())
                 .generate()?;
 
             fs::remove_file(file)?;
-            fs::remove_dir(TMP_PATH)?;
+            fs::remove_dir(tmp_path)?;
         }
 
         Command::Sandbox { config_path } => {
