@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 
 repository = "https://github.com/eduardogbg/temis"
 documentation = "https://docs.your_crate_name.com"
-readme = "README.md"
+readme = "../README.md"
 [dependencies]
 anyhow = "1.0.75"
 cargo = "0.74.0"
