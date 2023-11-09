@@ -1,7 +1,13 @@
 use clap::{Parser, Subcommand};
 use near_workspaces;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, io::Write, path::PathBuf, thread};
+use std::{
+    collections::HashMap,
+    fs,
+    io::{BufRead, Write},
+    path::PathBuf,
+    thread,
+};
 
 use crate::transactions::{create_contract_subaccount, deploy_contract};
 
@@ -11,9 +17,15 @@ mod transactions;
 const TMP_PATH: &'static str = "./tmp";
 
 #[derive(Serialize, Deserialize)]
-struct ContractConfig {
+pub struct ContractConfig {
     crate_name: String,
-    path: String,
+    crate_path: String,
+}
+
+impl ContractConfig {
+    pub fn manifest_path(&self) -> Result<PathBuf, std::io::Error> {
+        fs::canonicalize(format!("{}/Cargo.toml", self.crate_path))
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -101,8 +113,6 @@ async fn main() -> anyhow::Result<()> {
             f.write_all(sanitized.as_bytes())?;
             f.flush()?;
 
-            println!("chegou aq");
-
             near_abi_client::Generator::new(output_path)
                 .file(file.clone())
                 .generate()?;
@@ -118,17 +128,39 @@ async fn main() -> anyhow::Result<()> {
 
             let mut wasms: HashMap<String, String> = HashMap::new();
             for contract in sandbox_config.contracts {
-                std::process::Command::new("cargo")
-                    .args(&["build", "--target=wasm32-unknown-unknown", "--release"])
-                    .current_dir(contract.path)
-                    .status()?;
+                let build_output = std::process::Command::new("cargo")
+                    .args(&[
+                        "build",
+                        "--target=wasm32-unknown-unknown",
+                        "--release",
+                        "--message-format=json",
+                    ])
+                    .current_dir(contract.crate_path.clone())
+                    .output()?;
 
-                let artifact_path = format!(
-                    "../target/wasm32-unknown-unknown/release/{}.wasm",
-                    contract.crate_name
-                );
+                let manifest_path = contract.manifest_path()?;
 
-                wasms.insert(contract.crate_name, artifact_path);
+                for line in build_output.stdout.lines() {
+                    let artifact: serde_json::Value = serde_json::from_str(line?.as_str())?;
+
+                    if let Some(artifact_manifest_path) = artifact.get("manifest_path") {
+                        if artifact_manifest_path.as_str() == manifest_path.to_str() {
+                            if let Some(filenames) = artifact.get("filenames") {
+                                wasms.insert(
+                                    contract.crate_name.clone(),
+                                    filenames
+                                        .as_array()
+                                        .unwrap()
+                                        .get(0)
+                                        .unwrap()
+                                        .as_str()
+                                        .unwrap()
+                                        .to_string(),
+                                );
+                            }
+                        }
+                    }
+                }
             }
 
             let worker = near_workspaces::sandbox().await?;

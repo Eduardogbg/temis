@@ -2,7 +2,7 @@
     "contracts": [
         {
             "crate_name": "counter",
-            "path": "../samples/counter"
+            "crate_path": "../samples/counter"
         }
     ]
 }
