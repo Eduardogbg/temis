@@ -2,7 +2,13 @@
 name = "temis"
 version = "0.1.0"
 edition = "2021"
+authors = ["Eduardo Gomes <eduardogbg@gmail.com>","Claudio <claudiocarvalhovilasboas@gmail.com>"]
+description = "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+license = "MIT OR Apache-2.0"
 
+repository = "https://github.com/eduardogbg/temis"
+documentation = "https://docs.your_crate_name.com"
+readme = "README.md"
 [dependencies]
 anyhow = "1.0.75"
 cargo = "0.74.0"
